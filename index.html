@@ -152,36 +152,42 @@
 
         const CheckInModal = ({ isOpen, onClose, onConfirm, studentName }) => {
             const canvasRef = useRef(null);
+            const fullCanvasRef = useRef(null);
             const signaturePadRef = useRef(null);
             const [mediaFiles, setMediaFiles] = useState([]);
             const [lessonNote, setLessonNote] = useState('');
+            const [isFullScreen, setIsFullScreen] = useState(false);
             const fileInputRef = useRef(null);
 
+            const initSignaturePad = (canvas) => {
+                if (!canvas) return;
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                canvas.width = canvas.offsetWidth * ratio;
+                canvas.height = canvas.offsetHeight * ratio;
+                canvas.getContext("2d").scale(ratio, ratio);
+                
+                signaturePadRef.current = new SignaturePad(canvas, {
+                    backgroundColor: 'rgba(255, 255, 255, 0)',
+                    minWidth: 1.5,
+                    maxWidth: 4.5,
+                    velocityFilterWeight: 0.6,
+                    throttle: 10
+                });
+            };
+
             useEffect(() => {
-                if (isOpen && canvasRef.current) {
-                    const canvas = canvasRef.current;
-                    
-                    // Improved high-DPI scaling
-                    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                    const width = canvas.offsetWidth;
-                    const height = canvas.offsetHeight;
-                    
-                    canvas.width = width * ratio;
-                    canvas.height = height * ratio;
-                    canvas.getContext("2d").scale(ratio, ratio);
-                    
-                    signaturePadRef.current = new SignaturePad(canvas, {
-                        backgroundColor: 'rgba(255, 255, 255, 0)',
-                        minWidth: 1.5,
-                        maxWidth: 4.5,
-                        velocityFilterWeight: 0.6, // Smoother lines
-                        throttle: 10 // Better responsiveness
-                    });
-                    
-                    setMediaFiles([]); // Reset media
-                    setLessonNote(''); // Reset note
+                if (isOpen && !isFullScreen && canvasRef.current) {
+                    initSignaturePad(canvasRef.current);
+                    setMediaFiles([]); 
+                    setLessonNote('');
                 }
-            }, [isOpen]);
+            }, [isOpen, isFullScreen]);
+
+            useEffect(() => {
+                if (isFullScreen && fullCanvasRef.current) {
+                    initSignaturePad(fullCanvasRef.current);
+                }
+            }, [isFullScreen]);
 
             const handleFileChange = (e) => {
                 const files = Array.from(e.target.files);
@@ -217,6 +223,39 @@
 
             if (!isOpen) return null;
 
+            if (isFullScreen) {
+                return (
+                    <div className="fixed inset-0 bg-white z-[200] flex flex-col no-print">
+                        <div className="bg-emerald-600 p-6 flex justify-between items-center text-white">
+                            <div>
+                                <h2 className="text-xl font-bold">全螢幕手寫簽名</h2>
+                                <p className="text-emerald-100 text-xs">學員：{studentName}</p>
+                            </div>
+                            <div className="flex space-x-2">
+                                <button onClick={clear} className="bg-emerald-500 px-4 py-2 rounded-xl text-sm font-bold border border-emerald-400">
+                                    清除
+                                </button>
+                                <button onClick={() => setIsFullScreen(false)} className="bg-white text-emerald-600 px-6 py-2 rounded-xl text-sm font-bold shadow-md">
+                                    完成
+                                </button>
+                            </div>
+                        </div>
+                        <div className="flex-grow bg-emerald-50 relative p-4">
+                            <canvas 
+                                ref={fullCanvasRef} 
+                                className="signature-canvas w-full h-full bg-white shadow-inner"
+                            ></canvas>
+                            <div className="absolute inset-0 pointer-events-none flex items-center justify-center opacity-10">
+                                <Icon name="signature" className="w-40 h-40 text-emerald-900" />
+                            </div>
+                        </div>
+                        <div className="p-4 bg-white text-center text-gray-400 text-xs italic">
+                            請在白色區域內手寫簽名，完成後點擊右上角「完成」
+                        </div>
+                    </div>
+                );
+            }
+
             return (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-end justify-center z-[100] p-0 sm:p-4 no-print">
                     <div className="bg-white w-full max-w-md rounded-t-[40px] sm:rounded-[40px] p-8 animate-slide-up max-h-[95vh] overflow-y-auto no-scrollbar">
@@ -234,11 +273,19 @@
                         </div>
                         
                         {/* Signature Area */}
-                        <div className="relative mb-6">
+                        <div className="relative mb-6 group">
                             <canvas 
                                 ref={canvasRef} 
                                 className="signature-canvas w-full h-40 shadow-inner"
                             ></canvas>
+                            <div className="absolute top-3 right-3 flex space-x-2">
+                                <button 
+                                    onClick={() => setIsFullScreen(true)}
+                                    className="text-xs text-emerald-600 hover:bg-emerald-50 flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm border border-emerald-100 transition"
+                                >
+                                    <Icon name="maximize" className="w-3.5 h-3.5 mr-1" /> 全螢幕
+                                </button>
+                            </div>
                             <button 
                                 onClick={clear}
                                 className="absolute bottom-3 right-3 text-sm text-gray-400 hover:text-red-500 flex items-center bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100 transition"
