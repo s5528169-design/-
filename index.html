@@ -534,11 +534,18 @@
             const [deferredPrompt, setDeferredPrompt] = useState(null);
             const [isLocalFile, setIsLocalFile] = useState(false);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
+            const [isOnline, setIsOnline] = useState(navigator.onLine);
 
             useEffect(() => {
                 const loadedData = loadFromStorage();
                 setData(loadedData);
                 
+                // Online/Offline status
+                const handleOnline = () => setIsOnline(true);
+                const handleOffline = () => setIsOnline(false);
+                window.addEventListener('online', handleOnline);
+                window.addEventListener('offline', handleOffline);
+
                 // Check if running as local file
                 if (window.location.protocol === 'file:') {
                     setIsLocalFile(true);
@@ -549,6 +556,11 @@
                     e.preventDefault();
                     setDeferredPrompt(e);
                 });
+
+                return () => {
+                    window.removeEventListener('online', handleOnline);
+                    window.removeEventListener('offline', handleOffline);
+                };
             }, []);
 
             const exportData = () => {
@@ -1102,8 +1114,16 @@
 
             return (
                 <div className="min-h-screen max-w-md mx-auto bg-white shadow-2xl relative golf-ball-pattern">
+                    {/* Offline Warning */}
+                    {!isOnline && (
+                        <div className="bg-amber-500 text-white text-[10px] font-bold py-1 px-4 text-center sticky top-0 z-[60] flex items-center justify-center">
+                            <Icon name="wifi-off" className="w-3 h-3 mr-2" />
+                            目前處於離線模式，資料將儲存於本地裝置
+                        </div>
+                    )}
+
                     {/* Header */}
-                    <header className="px-6 pt-8 pb-4 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md sticky top-0 z-40 no-print border-b border-emerald-50">
+                    <header className={`px-6 pt-8 pb-4 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md sticky z-40 no-print border-b border-emerald-50 ${isOnline ? 'top-0' : 'top-[24px]'}`}>
                         <div className="cursor-pointer group" onClick={() => { setView('home'); setFilterStudentId(null); setSearchTerm(''); }}>
                             <div className="flex items-center">
                                 <Icon name="flag" className="w-8 h-8 text-emerald-600 mr-2 transform -rotate-12 group-hover:rotate-0 transition-transform" />
