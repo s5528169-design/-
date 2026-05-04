@@ -1,5 +1,5 @@
-const CACHE_NAME = 'golf-course-v3';
-const ASSETS_TO_CACHE = [
+const CACHE_NAME = 'golf-app-v4';
+const ASSETS = [
   './',
   'index.html',
   'manifest.json',
@@ -9,57 +9,35 @@ const ASSETS_TO_CACHE = [
   'https://unpkg.com/@babel/standalone/babel.min.js',
   'https://unpkg.com/lucide@latest',
   'https://cdn.jsdelivr.net/npm/signature_pad@4.1.7/dist/signature_pad.umd.min.js',
-  'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap',
-  'https://cdn-icons-png.flaticon.com/512/1039/1039328.png'
+  'https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap'
 ];
 
-// Install: Cache everything immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then((cache) => cache.addAll(ASSETS_TO_CACHE))
-      .then(() => self.skipWaiting())
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(ASSETS))
   );
+  self.skipWaiting();
 });
 
-// Activate: Clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    }).then(() => self.clients.claim())
+    caches.keys().then((keys) => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    ))
   );
 });
 
-// Fetch: Network first, fallback to cache for navigation. Cache first for assets.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
-
-  const url = new URL(event.request.url);
-
-  // For Navigation (opening the app)
-  if (event.request.mode === 'navigate') {
-    event.respondWith(
-      fetch(event.request)
-        .catch(() => caches.match('index.html'))
-    );
-    return;
-  }
-
-  // For Assets (CDN, fonts, images)
+  
   event.respondWith(
-    caches.match(event.request).then((response) => {
-      return response || fetch(event.request).then((fetchResponse) => {
-        return caches.open(CACHE_NAME).then((cache) => {
-          cache.put(event.request, fetchResponse.clone());
-          return fetchResponse;
-        });
+    caches.match(event.request).then((cached) => {
+      return cached || fetch(event.request).then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      }).catch(() => {
+        if (event.request.mode === 'navigate') return caches.match('index.html');
       });
     })
   );

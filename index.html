@@ -4,11 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>學員課程紀錄 - 數位記課管理</title>
-    <!-- PWA Meta Tags -->
+    <!-- PWA Basics -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="學員課程紀錄">
-    <meta name="theme-color" content="#2d6a4f">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/1039/1039328.png">
     
@@ -531,78 +529,12 @@
             const [newStudent, setNewStudent] = useState({ name: '', totalLessons: 0, note: '' });
             const [searchTerm, setSearchTerm] = useState('');
             const [filterStudentId, setFilterStudentId] = useState(null);
-            const [deferredPrompt, setDeferredPrompt] = useState(null);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
-            const [isOnline, setIsOnline] = useState(navigator.onLine);
-            const [swStatus, setSwStatus] = useState('檢測中...');
 
             useEffect(() => {
                 const loadedData = loadFromStorage();
                 setData(loadedData);
-                
-                // Online/Offline status
-                const handleOnline = () => setIsOnline(true);
-                const handleOffline = () => setIsOnline(false);
-                window.addEventListener('online', handleOnline);
-                window.addEventListener('offline', handleOffline);
-
-                // Check Service Worker Status with robust detection
-                const checkSW = () => {
-                    if ('serviceWorker' in navigator) {
-                        if (navigator.serviceWorker.controller) {
-                            setSwStatus('已就緒 (可離線使用)');
-                        } else {
-                            navigator.serviceWorker.getRegistration().then(reg => {
-                                if (reg) {
-                                    if (reg.installing) setSwStatus('安裝中...');
-                                    else if (reg.waiting) setSwStatus('更新中 (請重啟)');
-                                    else if (reg.active) setSwStatus('已啟用 (請重新整理)');
-                                } else {
-                                    setSwStatus('未安裝 (需透過網址開啟)');
-                                }
-                            });
-                        }
-                    } else {
-                        setSwStatus('不支援 (需 HTTPS)');
-                    }
-                };
-
-                // Immediate check and then periodically
-                checkSW();
-                const swInterval = setInterval(checkSW, 2000);
-
-                // Check if running as local file
-                if (window.location.protocol === 'file:') {
-                    setSwStatus('本地檔案 (不支援離線)');
-                }
-
-                // Listen for PWA install prompt
-                window.addEventListener('beforeinstallprompt', (e) => {
-                    e.preventDefault();
-                    setDeferredPrompt(e);
-                });
-
-                return () => {
-                    window.removeEventListener('online', handleOnline);
-                    window.removeEventListener('offline', handleOffline);
-                    clearInterval(swInterval);
-                };
             }, []);
-
-            const registerSWManual = () => {
-                setSwStatus('嘗試註冊中...');
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.register('sw.js?v=' + Date.now())
-                        .then(reg => {
-                            alert('註冊指令已發送，請觀察狀態變化。');
-                            if (reg.installing) setSwStatus('安裝中...');
-                        })
-                        .catch(err => {
-                            alert('註冊失敗：' + err.message + '\n請檢查 sw.js 檔案是否存在於伺服器根目錄。');
-                            setSwStatus('註冊失敗');
-                        });
-                }
-            };
 
             const exportData = () => {
                 try {
@@ -645,21 +577,6 @@
                     }
                 };
                 reader.readAsText(file);
-            };
-
-            const handleInstallClick = () => {
-                if (deferredPrompt) {
-                    deferredPrompt.prompt();
-                    deferredPrompt.userChoice.then((choiceResult) => {
-                        if (choiceResult.outcome === 'accepted') {
-                            setDeferredPrompt(null);
-                        }
-                    });
-                } else if (isLocalFile) {
-                    alert('目前是直接開啟檔案，無法安裝為 APP。請將專案上傳至網站空間（需 HTTPS）後，即可使用安裝功能。');
-                } else {
-                    alert('請使用瀏覽器選單中的「加入主畫面」功能進行安裝。');
-                }
             };
 
             useEffect(() => {
@@ -1155,16 +1072,8 @@
 
             return (
                 <div className="min-h-screen max-w-md mx-auto bg-white shadow-2xl relative golf-ball-pattern">
-                    {/* Offline Warning */}
-                    {!isOnline && (
-                        <div className="bg-amber-500 text-white text-[10px] font-bold py-1 px-4 text-center sticky top-0 z-[60] flex items-center justify-center">
-                            <Icon name="wifi-off" className="w-3 h-3 mr-2" />
-                            目前處於離線模式，資料將儲存於本地裝置
-                        </div>
-                    )}
-
                     {/* Header */}
-                    <header className={`px-6 pt-8 pb-4 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md sticky z-40 no-print border-b border-emerald-50 ${isOnline ? 'top-0' : 'top-[24px]'}`}>
+                    <header className="px-6 pt-8 pb-4 flex justify-between items-center bg-white bg-opacity-90 backdrop-blur-md sticky top-0 z-40 no-print border-b border-emerald-50">
                         <div className="cursor-pointer group" onClick={() => { setView('home'); setFilterStudentId(null); setSearchTerm(''); }}>
                             <div className="flex items-center">
                                 <Icon name="flag" className="w-8 h-8 text-emerald-600 mr-2 transform -rotate-12 group-hover:rotate-0 transition-transform" />
@@ -1174,17 +1083,8 @@
                                 </div>
                             </div>
                         </div>
-                        <div className="flex items-center space-x-2">
-                            <button 
-                                onClick={handleInstallClick}
-                                className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm border border-emerald-100 transition-colors ${deferredPrompt ? 'bg-emerald-600 text-white animate-bounce' : 'bg-emerald-50 text-emerald-600'}`}
-                                title="安裝 APP"
-                            >
-                                <Icon name="download-cloud" className="w-5 h-5" />
-                            </button>
-                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shadow-sm border border-emerald-100 text-emerald-600">
-                                <Icon name="bell" className="w-5 h-5" />
-                            </div>
+                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center shadow-sm border border-emerald-100 text-emerald-600">
+                            <Icon name="bell" className="w-5 h-5" />
                         </div>
                     </header>
 
@@ -1234,19 +1134,6 @@
                                         <p className="text-sm text-emerald-800 leading-relaxed">
                                             由於資料儲存在您的裝置本地，您可以透過匯出檔案來備份資料，或將檔案傳送到另一台裝置進行匯入，以達成同步。
                                         </p>
-                                        <div className="mt-3 pt-3 border-t border-emerald-200 flex justify-between items-center">
-                                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">離線存取狀態</span>
-                                            <div className="flex items-center space-x-2">
-                                                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${swStatus.includes('已就緒') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
-                                                    {swStatus}
-                                                </span>
-                                                {swStatus.includes('未安裝') && (
-                                                    <button onClick={registerSWManual} className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-md font-bold hover:bg-emerald-600">
-                                                        手動重試
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4">
@@ -1370,26 +1257,14 @@
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
 
-        // Register Service Worker for PWA
-        const registerSW = () => {
-            if ('serviceWorker' in navigator) {
-                // Remove the 'load' event listener to register immediately if script runs after load
-                navigator.serviceWorker.register('sw.js?v=3')
-                    .then(reg => {
-                        console.log('SW registered!', reg);
-                        // Force update if needed
-                        if (reg.waiting) {
-                            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
-                        }
-                    })
-                    .catch(err => {
-                        console.error('SW registration failed: ', err);
-                        window.lastSWError = err.message;
-                    });
-            }
-        };
-
-        registerSW();
+        // Simple & Robust Service Worker Registration
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                    .then(reg => console.log('APP 離線支援已就緒'))
+                    .catch(err => console.error('離線支援啟動失敗'));
+            });
+        }
     </script>
 </body>
 </html>
