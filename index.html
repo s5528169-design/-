@@ -532,9 +532,9 @@
             const [searchTerm, setSearchTerm] = useState('');
             const [filterStudentId, setFilterStudentId] = useState(null);
             const [deferredPrompt, setDeferredPrompt] = useState(null);
-            const [isLocalFile, setIsLocalFile] = useState(false);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
+            const [swStatus, setSwStatus] = useState('未偵測');
 
             useEffect(() => {
                 const loadedData = loadFromStorage();
@@ -546,9 +546,17 @@
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
 
+                // Check Service Worker Status
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.ready.then(registration => {
+                        setSwStatus('已就緒 (可離線使用)');
+                    });
+                }
+
                 // Check if running as local file
                 if (window.location.protocol === 'file:') {
                     setIsLocalFile(true);
+                    setSwStatus('本地檔案 (不支援離線功能)');
                 }
 
                 // Listen for PWA install prompt
@@ -1193,6 +1201,12 @@
                                         <p className="text-sm text-emerald-800 leading-relaxed">
                                             由於資料儲存在您的裝置本地，您可以透過匯出檔案來備份資料，或將檔案傳送到另一台裝置進行匯入，以達成同步。
                                         </p>
+                                        <div className="mt-3 pt-3 border-t border-emerald-200 flex justify-between items-center">
+                                            <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">離線存取狀態</span>
+                                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${swStatus.includes('已就緒') ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                                                {swStatus}
+                                            </span>
+                                        </div>
                                     </div>
 
                                     <div className="grid grid-cols-1 gap-4">

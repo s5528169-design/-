@@ -1,5 +1,5 @@
-const CACHE_NAME = 'golf-course-v2';
-const ASSETS = [
+const CACHE_NAME = 'golf-course-v3';
+const ASSETS_TO_CACHE = [
   './',
   'index.html',
   'manifest.json',
@@ -13,59 +13,53 @@ const ASSETS = [
   'https://cdn-icons-png.flaticon.com/512/1039/1039328.png'
 ];
 
-// Install Event - Caching Assets
+// Install: Cache everything immediately
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('Caching all assets...');
-      return cache.addAll(ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(ASSETS_TO_CACHE))
+      .then(() => self.skipWaiting())
   );
-  self.skipWaiting();
 });
 
-// Activate Event - Cleaning old caches
+// Activate: Clean up old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((cache) => {
-          if (cache !== CACHE_NAME) {
-            console.log('Deleting old cache:', cache);
-            return caches.delete(cache);
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            return caches.delete(cacheName);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
-  return self.clients.claim();
 });
 
-// Fetch Event - Cache First Strategy
+// Fetch: Network first, fallback to cache for navigation. Cache first for assets.
 self.addEventListener('fetch', (event) => {
-  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
+  const url = new URL(event.request.url);
+
+  // For Navigation (opening the app)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => caches.match('index.html'))
+    );
+    return;
+  }
+
+  // For Assets (CDN, fonts, images)
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      return fetch(event.request).then((networkResponse) => {
-        // Optional: Cache new requests on the fly
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        // If both fail (offline and not in cache)
-        if (event.request.mode === 'navigate') {
-          return caches.match('index.html');
-        }
+    caches.match(event.request).then((response) => {
+      return response || fetch(event.request).then((fetchResponse) => {
+        return caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, fetchResponse.clone());
+          return fetchResponse;
+        });
       });
     })
   );
