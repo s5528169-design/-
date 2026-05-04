@@ -1,0 +1,17 @@
+{
+  "name": "學員課程紀錄 - 專業高爾夫記課助手",
+  "short_name": "學員課程紀錄",
+  "description": "專業的高爾夫課程管理與簽到系統",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2d6a4f",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/1039/1039328.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
