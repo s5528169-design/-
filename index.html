@@ -157,12 +157,12 @@
             const [mediaFiles, setMediaFiles] = useState([]);
             const [lessonNote, setLessonNote] = useState('');
             const [isFullScreen, setIsFullScreen] = useState(false);
+            const [tempSignature, setTempSignature] = useState(null);
             const fileInputRef = useRef(null);
 
-            const initSignaturePad = (canvas) => {
+            const initSignaturePad = (canvas, existingDataUrl = null) => {
                 if (!canvas) return;
                 
-                // Robust size detection
                 const rect = canvas.getBoundingClientRect();
                 const ratio = Math.max(window.devicePixelRatio || 1, 1);
                 
@@ -171,40 +171,52 @@
                 canvas.getContext("2d").scale(ratio, ratio);
                 
                 if (signaturePadRef.current) {
-                    signaturePadRef.current.off(); // Cleanup old instance
+                    signaturePadRef.current.off(); 
                 }
 
-                signaturePadRef.current = new SignaturePad(canvas, {
+                const pad = new SignaturePad(canvas, {
                     backgroundColor: 'rgba(255, 255, 255, 0)',
                     minWidth: 1.8,
                     maxWidth: 5.0,
                     velocityFilterWeight: 0.7,
-                    throttle: 0 // Zero throttle for maximum responsiveness on large area
+                    throttle: 0 
                 });
+                
+                signaturePadRef.current = pad;
+
+                if (existingDataUrl) {
+                    pad.fromDataURL(existingDataUrl, { ratio: ratio, width: rect.width, height: rect.height });
+                }
             };
 
             useEffect(() => {
                 if (isOpen && !isFullScreen && canvasRef.current) {
-                    // Small delay to ensure modal animation finished and dimensions are stable
                     const timer = setTimeout(() => {
-                        initSignaturePad(canvasRef.current);
+                        initSignaturePad(canvasRef.current, tempSignature);
                     }, 350);
-                    
+                    return () => clearTimeout(timer);
+                }
+                if (isOpen && !isFullScreen && !tempSignature) {
                     setMediaFiles([]); 
                     setLessonNote('');
-                    return () => clearTimeout(timer);
                 }
             }, [isOpen, isFullScreen]);
 
             useEffect(() => {
                 if (isFullScreen && fullCanvasRef.current) {
-                    // Critical: Wait for the full-screen DOM to be fully laid out
                     const timer = setTimeout(() => {
-                        initSignaturePad(fullCanvasRef.current);
+                        initSignaturePad(fullCanvasRef.current, tempSignature);
                     }, 50);
                     return () => clearTimeout(timer);
                 }
             }, [isFullScreen]);
+
+            const handleToggleFullScreen = (toFull) => {
+                if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
+                    setTempSignature(signaturePadRef.current.toDataURL());
+                }
+                setIsFullScreen(toFull);
+            };
 
             const handleFileChange = (e) => {
                 const files = Array.from(e.target.files);
@@ -224,6 +236,7 @@
             const handleConfirm = () => {
                 if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
                     onConfirm(signaturePadRef.current.toDataURL(), mediaFiles, lessonNote);
+                    setTempSignature(null);
                     onClose();
                 } else {
                     alert('請先完成手寫簽名');
@@ -232,6 +245,12 @@
 
             const clear = () => {
                 if (signaturePadRef.current) signaturePadRef.current.clear();
+                setTempSignature(null);
+            };
+
+            const handleClose = () => {
+                setTempSignature(null);
+                onClose();
             };
 
             const removeMedia = (index) => {
@@ -252,7 +271,7 @@
                                 <button onClick={clear} className="bg-emerald-500 px-4 py-2 rounded-xl text-sm font-bold border border-emerald-400">
                                     清除
                                 </button>
-                                <button onClick={() => setIsFullScreen(false)} className="bg-white text-emerald-600 px-6 py-2 rounded-xl text-sm font-bold shadow-md">
+                                <button onClick={() => handleToggleFullScreen(false)} className="bg-white text-emerald-600 px-6 py-2 rounded-xl text-sm font-bold shadow-md">
                                     完成
                                 </button>
                             </div>
@@ -284,7 +303,7 @@
                                 </h2>
                                 <p className="text-gray-500 text-sm">請學員 <span className="text-emerald-600 font-bold">{studentName}</span> 在下方簽名</p>
                             </div>
-                            <button onClick={onClose} className="bg-gray-100 p-2 rounded-full hover:bg-red-50 transition">
+                            <button onClick={handleClose} className="bg-gray-100 p-2 rounded-full hover:bg-red-50 transition">
                                 <Icon name="x" className="w-5 h-5 text-gray-500" />
                             </button>
                         </div>
@@ -297,7 +316,7 @@
                             ></canvas>
                             <div className="absolute top-3 right-3 flex space-x-2">
                                 <button 
-                                    onClick={() => setIsFullScreen(true)}
+                                    onClick={() => handleToggleFullScreen(true)}
                                     className="text-xs text-emerald-600 hover:bg-emerald-50 flex items-center bg-white px-3 py-1.5 rounded-full shadow-sm border border-emerald-100 transition"
                                 >
                                     <Icon name="maximize" className="w-3.5 h-3.5 mr-1" /> 全螢幕
