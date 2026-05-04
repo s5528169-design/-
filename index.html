@@ -709,7 +709,21 @@
             );
 
             const renderLogs = () => {
-                // Chunking logic for 10 items per page
+                // Grouping logic for PDF export
+                const getGroupedLogs = () => {
+                    const grouped = {};
+                    filteredLogs.forEach(log => {
+                        if (!grouped[log.studentId]) {
+                            grouped[log.studentId] = {
+                                studentName: log.studentName,
+                                logs: []
+                            };
+                        }
+                        grouped[log.studentId].logs.push(log);
+                    });
+                    return Object.values(grouped);
+                };
+
                 const chunkArray = (arr, size) => {
                     const chunks = [];
                     for (let i = 0; i < arr.length; i += size) {
@@ -718,7 +732,7 @@
                     return chunks;
                 };
 
-                const logChunks = chunkArray(filteredLogs, 10);
+                const groupedLogs = getGroupedLogs();
 
                 return (
                     <div className="space-y-4 pb-24">
@@ -743,15 +757,14 @@
                                 onClick={exportPDF}
                                 className="w-full text-white text-sm font-bold flex items-center justify-center bg-emerald-600 py-4 rounded-2xl shadow-lg shadow-emerald-100 hover:bg-emerald-700 transition transform active:scale-95"
                             >
-                                <Icon name="file-text" className="w-5 h-5 mr-2" /> 匯出課程報告 / 列印 (每頁10筆)
+                                <Icon name="file-text" className="w-5 h-5 mr-2" /> 匯出課程報告 / 列印 (依學員分頁)
                             </button>
                         </div>
 
                         {/* Print Header */}
                         <div className="print-only mb-4 text-center">
-                            <h1 className="text-2xl font-bold text-emerald-800">學員課程紀錄報告</h1>
+                            <h1 className="text-2xl font-bold text-emerald-800">學員課程紀錄總覽報告</h1>
                             <p className="text-gray-400 text-xs">生成時間：{new Date().toLocaleString()}</p>
-                            {filterStudentId && <p className="text-lg mt-2 font-bold text-emerald-600 border-b-2 border-emerald-100 inline-block pb-1">學員：{currentFilteredStudentName}</p>}
                         </div>
                         
                         <div className="space-y-4">
@@ -761,7 +774,7 @@
                                     <p>尚無相關簽到紀錄</p>
                                 </div>
                             ) : (
-                                // Web View (No chunking needed for normal scroll)
+                                // Web View (Standard list)
                                 <div className="no-print space-y-4">
                                     {filteredLogs.map(log => (
                                         <div key={log.id} className="bg-white p-6 rounded-3xl shadow-sm border border-emerald-50 log-card hover:border-emerald-200 transition-all">
@@ -833,41 +846,51 @@
                                 </div>
                             )}
 
-                            {/* Print View (Chunked) */}
+                            {/* Print View (Grouped by Student + Chunked by 10) */}
                             <div className="print-only">
-                                {logChunks.map((chunk, pageIdx) => (
-                                    <div key={pageIdx} className="print-page">
-                                        {pageIdx > 0 && (
-                                            <div className="mb-8 text-center border-b border-emerald-100 pb-4">
-                                                <h2 className="text-xl font-bold text-emerald-800">學員課程紀錄報告 (續)</h2>
-                                                {filterStudentId && <p className="text-sm font-bold text-emerald-600">學員：{currentFilteredStudentName} - 第 {pageIdx + 1} 頁</p>}
-                                            </div>
-                                        )}
-                                        {chunk.map(log => (
-                                            <div key={log.id} className="log-card">
-                                                <div className="header-info">
-                                                    <p className="font-bold text-sm text-gray-800">{log.studentName}</p>
-                                                    <p className="text-[10px] text-gray-400">
-                                                        {new Date(log.timestamp).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })}
-                                                    </p>
-                                                    <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100 lesson-badge inline-block mt-1">-1 堂</span>
-                                                </div>
-                                                
-                                                <div className="note-box bg-emerald-50 rounded-lg p-2 text-[11px] text-emerald-800">
-                                                    {log.note || <span className="text-gray-300 italic">無備註紀錄</span>}
-                                                </div>
+                                {groupedLogs.map((group, groupIdx) => {
+                                    const logChunks = chunkArray(group.logs, 10);
+                                    return (
+                                        <React.Fragment key={groupIdx}>
+                                            {logChunks.map((chunk, pageIdx) => (
+                                                <div key={pageIdx} className="print-page">
+                                                    <div className="mb-6 text-center border-b-2 border-emerald-600 pb-2">
+                                                        <h2 className="text-xl font-bold text-emerald-800">
+                                                            學員：{group.studentName} - 課程紀錄報告
+                                                        </h2>
+                                                        <p className="text-xs text-gray-500">
+                                                            第 {pageIdx + 1} 頁 {logChunks.length > 1 ? `(共 ${logChunks.length} 頁)` : ''}
+                                                        </p>
+                                                    </div>
+                                                    
+                                                    {chunk.map(log => (
+                                                        <div key={log.id} className="log-card">
+                                                            <div className="header-info">
+                                                                <p className="font-bold text-sm text-gray-800">{log.studentName}</p>
+                                                                <p className="text-[10px] text-gray-400">
+                                                                    {new Date(log.timestamp).toLocaleString('zh-TW', { dateStyle: 'medium', timeStyle: 'short' })}
+                                                                </p>
+                                                                <span className="bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full text-[10px] font-bold border border-emerald-100 lesson-badge inline-block mt-1">-1 堂</span>
+                                                            </div>
+                                                            
+                                                            <div className="note-box bg-emerald-50 rounded-lg p-2 text-[11px] text-emerald-800">
+                                                                {log.note || <span className="text-gray-300 italic">無備註紀錄</span>}
+                                                            </div>
 
-                                                <div className="signature-box flex-shrink-0 bg-white rounded-lg flex items-center justify-center">
-                                                    {log.signature ? (
-                                                        <img src={log.signature} alt="Signature" className="max-h-10 object-contain" />
-                                                    ) : (
-                                                        <span className="text-[8px] text-gray-200 italic">無簽名</span>
-                                                    )}
+                                                            <div className="signature-box flex-shrink-0 bg-white rounded-lg flex items-center justify-center">
+                                                                {log.signature ? (
+                                                                    <img src={log.signature} alt="Signature" className="max-h-10 object-contain" />
+                                                                ) : (
+                                                                    <span className="text-[8px] text-gray-200 italic">無簽名</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ))}
+                                            ))}
+                                        </React.Fragment>
+                                    );
+                                })}
                             </div>
                         </div>
                     </div>
