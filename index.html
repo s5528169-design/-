@@ -52,6 +52,7 @@
             border-radius: 2rem;
             cursor: crosshair;
             background-color: #f7fee7;
+            touch-action: none; /* Prevent scrolling while signing */
         }
         @keyframes slideUp {
             from { transform: translateY(100%); }
@@ -159,14 +160,24 @@
             useEffect(() => {
                 if (isOpen && canvasRef.current) {
                     const canvas = canvasRef.current;
+                    
+                    // Improved high-DPI scaling
                     const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                    canvas.width = canvas.offsetWidth * ratio;
-                    canvas.height = canvas.offsetHeight * ratio;
+                    const width = canvas.offsetWidth;
+                    const height = canvas.offsetHeight;
+                    
+                    canvas.width = width * ratio;
+                    canvas.height = height * ratio;
                     canvas.getContext("2d").scale(ratio, ratio);
                     
                     signaturePadRef.current = new SignaturePad(canvas, {
-                        backgroundColor: 'rgba(255, 255, 255, 0)'
+                        backgroundColor: 'rgba(255, 255, 255, 0)',
+                        minWidth: 1.5,
+                        maxWidth: 4.5,
+                        velocityFilterWeight: 0.6, // Smoother lines
+                        throttle: 10 // Better responsiveness
                     });
+                    
                     setMediaFiles([]); // Reset media
                     setLessonNote(''); // Reset note
                 }
@@ -544,11 +555,26 @@
             };
 
             const deleteLog = (id) => {
-                if (confirm('確定要刪除這筆紀錄嗎？此動作不會退還已扣除的堂數。')) {
-                    setData(prev => ({
-                        ...prev,
-                        logs: prev.logs.filter(l => l.id !== id)
-                    }));
+                const logToDelete = data.logs.find(l => l.id === id);
+                if (!logToDelete) return;
+
+                if (confirm(`確定要刪除這筆紀錄嗎？\n\n系統將自動退還學員「${logToDelete.studentName}」 1 堂課。`)) {
+                    const updatedStudents = data.students.map(s => {
+                        if (s.id === logToDelete.studentId) {
+                            return {
+                                ...s,
+                                remainingLessons: Number(s.remainingLessons) + 1
+                            };
+                        }
+                        return s;
+                    });
+
+                    const updatedLogs = data.logs.filter(l => l.id !== id);
+
+                    setData({
+                        students: updatedStudents,
+                        logs: updatedLogs
+                    });
                 }
             };
 
