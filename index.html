@@ -161,31 +161,48 @@
 
             const initSignaturePad = (canvas) => {
                 if (!canvas) return;
+                
+                // Robust size detection
+                const rect = canvas.getBoundingClientRect();
                 const ratio = Math.max(window.devicePixelRatio || 1, 1);
-                canvas.width = canvas.offsetWidth * ratio;
-                canvas.height = canvas.offsetHeight * ratio;
+                
+                canvas.width = rect.width * ratio;
+                canvas.height = rect.height * ratio;
                 canvas.getContext("2d").scale(ratio, ratio);
                 
+                if (signaturePadRef.current) {
+                    signaturePadRef.current.off(); // Cleanup old instance
+                }
+
                 signaturePadRef.current = new SignaturePad(canvas, {
                     backgroundColor: 'rgba(255, 255, 255, 0)',
-                    minWidth: 1.5,
-                    maxWidth: 4.5,
-                    velocityFilterWeight: 0.6,
-                    throttle: 10
+                    minWidth: 1.8,
+                    maxWidth: 5.0,
+                    velocityFilterWeight: 0.7,
+                    throttle: 0 // Zero throttle for maximum responsiveness on large area
                 });
             };
 
             useEffect(() => {
                 if (isOpen && !isFullScreen && canvasRef.current) {
-                    initSignaturePad(canvasRef.current);
+                    // Small delay to ensure modal animation finished and dimensions are stable
+                    const timer = setTimeout(() => {
+                        initSignaturePad(canvasRef.current);
+                    }, 350);
+                    
                     setMediaFiles([]); 
                     setLessonNote('');
+                    return () => clearTimeout(timer);
                 }
             }, [isOpen, isFullScreen]);
 
             useEffect(() => {
                 if (isFullScreen && fullCanvasRef.current) {
-                    initSignaturePad(fullCanvasRef.current);
+                    // Critical: Wait for the full-screen DOM to be fully laid out
+                    const timer = setTimeout(() => {
+                        initSignaturePad(fullCanvasRef.current);
+                    }, 50);
+                    return () => clearTimeout(timer);
                 }
             }, [isFullScreen]);
 
