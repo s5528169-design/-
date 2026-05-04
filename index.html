@@ -534,7 +534,7 @@
             const [deferredPrompt, setDeferredPrompt] = useState(null);
             const [isDataModalOpen, setIsDataModalOpen] = useState(false);
             const [isOnline, setIsOnline] = useState(navigator.onLine);
-            const [swStatus, setSwStatus] = useState('未偵測');
+            const [swStatus, setSwStatus] = useState('檢測中...');
 
             useEffect(() => {
                 const loadedData = loadFromStorage();
@@ -546,17 +546,34 @@
                 window.addEventListener('online', handleOnline);
                 window.addEventListener('offline', handleOffline);
 
-                // Check Service Worker Status
-                if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.ready.then(registration => {
-                        setSwStatus('已就緒 (可離線使用)');
-                    });
-                }
+                // Check Service Worker Status with robust detection
+                const checkSW = () => {
+                    if ('serviceWorker' in navigator) {
+                        if (navigator.serviceWorker.controller) {
+                            setSwStatus('已就緒 (可離線使用)');
+                        } else {
+                            navigator.serviceWorker.getRegistration().then(reg => {
+                                if (reg) {
+                                    if (reg.installing) setSwStatus('安裝中...');
+                                    else if (reg.waiting) setSwStatus('更新中 (請重啟)');
+                                    else if (reg.active) setSwStatus('已啟用 (請重新整理)');
+                                } else {
+                                    setSwStatus('未安裝 (需透過網址開啟)');
+                                }
+                            });
+                        }
+                    } else {
+                        setSwStatus('不支援 (需 HTTPS)');
+                    }
+                };
+
+                // Immediate check and then periodically
+                checkSW();
+                const swInterval = setInterval(checkSW, 2000);
 
                 // Check if running as local file
                 if (window.location.protocol === 'file:') {
-                    setIsLocalFile(true);
-                    setSwStatus('本地檔案 (不支援離線功能)');
+                    setSwStatus('本地檔案 (不支援離線)');
                 }
 
                 // Listen for PWA install prompt
@@ -568,6 +585,7 @@
                 return () => {
                     window.removeEventListener('online', handleOnline);
                     window.removeEventListener('offline', handleOffline);
+                    clearInterval(swInterval);
                 };
             }, []);
 
